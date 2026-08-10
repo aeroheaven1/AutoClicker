@@ -1,0 +1,59 @@
+package com.autoclicker.app.data
+
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.util.UUID
+
+/**
+ * 脚本动作类型
+ */
+enum class ActionType {
+    TAP,        // 点击
+    SWIPE,      // 滑动
+    LONG_PRESS, // 长按
+    DELAY       // 延迟等待
+}
+
+/**
+ * 单个动作
+ */
+data class ScriptAction(
+    val type: ActionType,
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val x2: Float = 0f,       // 滑动终点X
+    val y2: Float = 0f,       // 滑动终点Y
+    val duration: Long = 100L, // 持续时间(ms) - 长按/滑动
+    val delay: Long = 0L       // 延迟(ms) - DELAY类型使用
+)
+
+/**
+ * 脚本定义
+ */
+data class Script(
+    val id: String = UUID.randomUUID().toString(),
+    var name: String = "未命名脚本",
+    var actions: MutableList<ScriptAction> = mutableListOf(),
+    var repeatCount: Int = 1,           // 重复次数, 0=无限
+    var intervalBetweenRepeats: Long = 500L, // 重复间隔(ms)
+    var intervalBetweenActions: Long = 100L, // 动作间隔(ms)
+    val createdAt: Long = System.currentTimeMillis(),
+    var updatedAt: Long = System.currentTimeMillis()
+) {
+    val totalActions: Int get() = actions.size
+
+    companion object {
+        private val gson = Gson()
+
+        fun toJson(script: Script): String = gson.toJson(script)
+
+        fun fromJson(json: String): Script = gson.fromJson(json, Script::class.java)
+
+        fun listToJson(scripts: List<Script>): String = gson.toJson(scripts)
+
+        fun listFromJson(json: String): List<Script> {
+            val type = object : TypeToken<List<Script>>() {}.type
+            return gson.fromJson(json, type)
+        }
+    }
+}
