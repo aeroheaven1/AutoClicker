@@ -48,6 +48,7 @@ class ClickService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var runner: ICommandRunner? = null
     private var executionJob: Job? = null
+    private var ocrEngine: OcrEngine? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -143,6 +144,8 @@ class ClickService : Service() {
         }
 
         executionJob = serviceScope.launch {
+            // 创建 OCR 引擎 (用于 FIND_TEXT 动作)
+            ocrEngine = OcrEngine(applicationContext, runner!!)
             executeScript(script)
         }
     }
@@ -197,6 +200,12 @@ class ClickService : Service() {
             return
         }
 
+        // FIND_TEXT 类型: 截屏 OCR 找字点击
+        if (action.type == ActionType.FIND_TEXT) {
+            executeFindText(runner, action)
+            return
+        }
+
         val cmd = buildActionCommand(action)
         if (cmd.isNotEmpty()) {
             withContext(Dispatchers.IO) {
@@ -205,6 +214,38 @@ class ClickService : Service() {
             // 等待动作执行完成 (滑动/长按需要时间)
             if (action.duration > 0) {
                 delay((action.duration / speed).toLong().coerceAtLeast(0) + 50)
+            }
+        }
+    }
+
+    /**
+     * 文字识别找字点击
+     */
+    private suspend fun executeFindText(runner: ICommandRunner, action: ScriptAction) {
+        val text = action.text.trim()
+        if (text.isEmpty()) return
+
+        val engine = ocrEngine ?: return
+        // 未下载模型则跳过
+        if (!engine.isModelReady()) {
+            Log.e(TAG, "FIND_TEXT: OCR 模型未下载, 跳过 [$text]")
+            return
+        }
+
+        withContext(Dispatchers.IO) {
+            try {
+                val bmp = engine.captureScreen() ?: return@withContext
+                val words = engine.recognizeWords(bmp)
+                val word = engine.findWord(words, text)
+                if (word != null) {
+                    Log.d(TAG, "FIND_TEXT 找到 [$text] at (${word.centerX},${word.centerY})")
+                    runner.exec("input tap ${word.centerX} ${word.centerY}")
+                } else {
+                    Log.w(TAG, "FIND_TEXT 未找到 [$text]")
+                }
+                bmp.recycle()
+            } catch (e: Exception) {
+                Log.e(TAG, "executeFindText error: ${e.message}")
             }
         }
     }

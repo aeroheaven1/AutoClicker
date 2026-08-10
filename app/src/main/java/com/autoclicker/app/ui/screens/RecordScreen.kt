@@ -212,6 +212,17 @@ fun RecordScreen(
                                     Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp))
                                 }
                             )
+                            AssistChip(
+                                onClick = {
+                                    recordedActions.add(
+                                        ScriptAction(type = ActionType.FIND_TEXT, text = "按钮文字")
+                                    )
+                                },
+                                label = { Text("+ 找字") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
+                            )
                         }
                     }
                 }
@@ -387,6 +398,7 @@ fun ActionItem(
                     ActionType.SWIPE -> Icons.Default.Swipe
                     ActionType.LONG_PRESS -> Icons.Default.TouchApp
                     ActionType.DELAY -> Icons.Default.Timer
+                    ActionType.FIND_TEXT -> Icons.Default.Search
                 },
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
@@ -404,6 +416,7 @@ fun ActionItem(
                         ActionType.SWIPE -> "滑动 (${action.x.toInt()},${action.y.toInt()}) → (${action.x2.toInt()},${action.y2.toInt()})"
                         ActionType.LONG_PRESS -> "长按 (${action.x.toInt()}, ${action.y.toInt()}) ${action.duration}ms"
                         ActionType.DELAY -> "等待 ${action.delay}ms"
+                        ActionType.FIND_TEXT -> "找字点击: \"${action.text}\""
                     },
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -452,6 +465,7 @@ fun EditActionDialog(
     var y2 by remember { mutableStateOf(action.y2.toString()) }
     var duration by remember { mutableStateOf(action.duration.toString()) }
     var delay by remember { mutableStateOf(action.delay.toString()) }
+    var text by remember { mutableStateOf(action.text) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -460,7 +474,16 @@ fun EditActionDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("类型: ${action.type.name}", style = MaterialTheme.typography.labelLarge)
 
-                if (action.type == ActionType.RANDOM_TAP) {
+                if (action.type == ActionType.FIND_TEXT) {
+                    // 找字点击: 输入要识别的文字
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        label = { Text("要识别的文字 (如: 确定, 开始)") },
+                        singleLine = false,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else if (action.type == ActionType.RANDOM_TAP) {
                     // 随机区域: 左上角 + 右下角
                     Text("区域左上角", style = MaterialTheme.typography.labelSmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -562,7 +585,8 @@ fun EditActionDialog(
                         x2 = x2.toFloatOrNull() ?: action.x2,
                         y2 = y2.toFloatOrNull() ?: action.y2,
                         duration = duration.toLongOrNull() ?: action.duration,
-                        delay = delay.toLongOrNull() ?: action.delay
+                        delay = delay.toLongOrNull() ?: action.delay,
+                        text = text
                     )
                 )
             }) {

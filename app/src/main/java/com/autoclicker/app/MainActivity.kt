@@ -17,8 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.autoclicker.app.data.Script
+import com.autoclicker.app.data.ScriptAction
 import com.autoclicker.app.data.ScriptRepository
 import com.autoclicker.app.service.ClickService
+import com.autoclicker.app.service.OcrEngine
 import com.autoclicker.app.service.RootRunner
 import com.autoclicker.app.service.ShizukuRunner
 import com.autoclicker.app.service.TouchEventRecorder
@@ -26,6 +28,7 @@ import com.autoclicker.app.ui.components.CoordinatePicker
 import com.autoclicker.app.ui.components.FloatingControl
 import com.autoclicker.app.ui.screens.CoordinatePickerActions
 import com.autoclicker.app.ui.screens.HomeScreen
+import com.autoclicker.app.ui.screens.OcrScreen
 import com.autoclicker.app.ui.screens.RecordScreen
 import com.autoclicker.app.ui.screens.SettingsScreen
 import com.autoclicker.app.ui.theme.AutoClickerTheme
@@ -48,6 +51,9 @@ class MainActivity : ComponentActivity() {
 
     // 坐标拾取器
     private var coordinatePicker: CoordinatePicker? = null
+
+    // OCR 引擎
+    private var ocrEngine: OcrEngine? = null
 
     // 悬浮窗权限请求
     private val overlayPermissionLauncher = registerForActivityResult(
@@ -119,6 +125,7 @@ class MainActivity : ComponentActivity() {
                 onDeleteScript = { script -> handleDeleteScript(script) },
                 onNavigateToRecord = { currentScreen = "record" },
                 onNavigateToSettings = { currentScreen = "settings" },
+                onNavigateToOcr = { currentScreen = "ocr" },
                 onQuickTap = { x, y, duration, repeat ->
                     executeQuickAction("TAP", x, y, 0f, 0f, duration, repeat)
                 },
@@ -149,7 +156,67 @@ class MainActivity : ComponentActivity() {
                     Toast.makeText(this@MainActivity, "权限状态: $permissionType", Toast.LENGTH_SHORT).show()
                 }
             )
+            "ocr" -> OcrScreen(
+                onBack = { currentScreen = "home" },
+                modelReady = { getOcrEngine()?.isModelReady() == true },
+                downloadModel = { getOcrEngine()?.ensureModel() ?: false },
+                recognize = ocrRecognize@{
+                    val engine = getOcrEngine() ?: return@ocrRecognize emptyList()
+                    val (_, words) = engine.captureAndRecognize()
+                    words
+                },
+                onWordClicked = { word -> handleWordClicked(word) }
+            )
         }
+    }
+
+    /** 获取或创建 OCR 引擎 */
+    private fun getOcrEngine(): OcrEngine? {
+        if (ocrEngine == null) {
+            val shizuku = ShizukuRunner(applicationContext)
+            val root = RootRunner()
+            val runner = when {
+                shizuku.isAvailable() -> shizuku
+                root.isAvailable() -> root
+                else -> return null
+            }
+            ocrEngine = OcrEngine(applicationContext, runner)
+        }
+        return ocrEngine
+    }
+
+    /** 处理识别出的文字: 立即点击或创建找字脚本 */
+    private fun handleWordClicked(word: com.autoclicker.app.service.OcrWord) {
+        val options = arrayOf("立即点击该文字", "创建\"找字点击\"脚本")
+        android.app.AlertDialog.Builder(this)
+            .setTitle("文字: ${word.text}")
+            .setMessage("位置: (${word.centerX}, ${word.centerY})")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        // 立即点击
+                        executeQuickAction("TAP", word.centerX.toFloat(), word.centerY.toFloat(), 0f, 0f, 100L, 1)
+                    }
+                    1 -> {
+                        // 创建找字点击脚本
+                        val script = Script(
+                            name = "找字点击: ${word.text}",
+                            actions = mutableListOf(
+                                ScriptAction(type = com.autoclicker.app.data.ActionType.FIND_TEXT, text = word.text)
+                            ),
+                            repeatCount = 1,
+                            intervalBetweenActions = 100,
+                            intervalBetweenRepeats = 500
+                        )
+                        lifecycleScope.launch {
+                            scriptRepository.saveScript(script)
+                            Toast.makeText(this@MainActivity, "✓ 已创建脚本: ${script.name}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun handlePlayScript(script: Script) {

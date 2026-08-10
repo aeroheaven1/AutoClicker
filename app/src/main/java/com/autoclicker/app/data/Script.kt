@@ -12,7 +12,8 @@ enum class ActionType {
     SWIPE,      // 滑动
     LONG_PRESS, // 长按
     DELAY,      // 延迟等待
-    RANDOM_TAP  // 随机区域点击 (x,y)-(x2,y2) 为区域范围
+    RANDOM_TAP, // 随机区域点击 (x,y)-(x2,y2) 为区域范围
+    FIND_TEXT   // 文字识别找字点击 (text 为要查找的文字)
 }
 
 /**
@@ -25,7 +26,8 @@ data class ScriptAction(
     val x2: Float = 0f,       // 滑动终点X / 随机区域右下角X
     val y2: Float = 0f,       // 滑动终点Y / 随机区域右下角Y
     val duration: Long = 100L, // 持续时间(ms) - 长按/滑动
-    val delay: Long = 0L       // 延迟(ms) - DELAY类型使用
+    val delay: Long = 0L,     // 延迟(ms) - DELAY类型使用
+    val text: String = ""     // 文字 - FIND_TEXT类型使用
 )
 
 /**

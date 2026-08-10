@@ -93,6 +93,9 @@ dependencies {
     // Gson for script serialization
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // OCR (Tesseract, 离线中文识别)
+    implementation("com.rmtheis:tess-two:9.1.0")
+
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

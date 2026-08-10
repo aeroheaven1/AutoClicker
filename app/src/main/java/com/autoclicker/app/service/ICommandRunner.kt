@@ -24,4 +24,7 @@ interface ICommandRunner {
 
     /** 停止流式命令 */
     fun stopStream() {}
+
+    /** 读取文件 (返回 byte[], 失败返回 null) */
+    fun readFile(path: String): ByteArray? = null
 }

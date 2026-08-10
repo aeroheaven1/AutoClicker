@@ -111,5 +111,14 @@ class RootRunner : ICommandRunner {
         streamThread = null
     }
 
+    override fun readFile(path: String): ByteArray? {
+        return try {
+            val file = java.io.File(path)
+            if (file.exists()) file.readBytes() else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     override fun getPermissionType(): String = "Root"
 }

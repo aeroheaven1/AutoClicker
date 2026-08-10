@@ -36,6 +36,7 @@ fun HomeScreen(
     onDeleteScript: (Script) -> Unit,
     onNavigateToRecord: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToOcr: () -> Unit,
     onQuickTap: (Float, Float, Long, Int) -> Unit,
     onQuickSwipe: (Float, Float, Float, Float, Long, Int) -> Unit,
     pickerActions: CoordinatePickerActions
@@ -121,6 +122,30 @@ fun HomeScreen(
                             Icon(Icons.Default.Swipe, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("快速滑动", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // 文字识别
+                        FilledTonalButton(
+                            onClick = onNavigateToOcr,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("文字识别", style = MaterialTheme.typography.labelLarge)
+                        }
+                        // 屏幕取点
+                        FilledTonalButton(
+                            onClick = { onPickTap { x, y -> onQuickTap(x, y, 100L, 1) } },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("屏幕取点", style = MaterialTheme.typography.labelLarge)
                         }
                     }
                 }

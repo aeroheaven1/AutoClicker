@@ -161,6 +161,7 @@ fun ActionChip(action: com.autoclicker.app.data.ScriptAction) {
         ActionType.SWIPE -> Icons.Default.Swipe to "滑动"
         ActionType.LONG_PRESS -> Icons.Default.TouchApp to "长按(${action.x.toInt()},${action.y.toInt()})"
         ActionType.DELAY -> Icons.Default.Timer to "等待${action.delay}ms"
+        ActionType.FIND_TEXT -> Icons.Default.Search to "找字:${action.text}"
     }
 
     SuggestionChip(

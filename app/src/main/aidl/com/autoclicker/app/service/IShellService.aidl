@@ -12,4 +12,7 @@ interface IShellService {
     void startStream(String command) = 4;
     String readStream() = 5;
     void stopStream() = 6;
+
+    // 文件读取 (用于截屏等二进制文件)
+    byte[] readFile(String path) = 7;
 }

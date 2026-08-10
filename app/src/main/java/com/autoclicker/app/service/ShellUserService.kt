@@ -148,6 +148,20 @@ class ShellUserService : IShellService.Stub {
         streamThread = null
     }
 
+    /**
+     * 读取文件内容 (用于截屏 PNG 等二进制)
+     */
+    override fun readFile(path: String): ByteArray? {
+        return try {
+            val file = java.io.File(path)
+            if (!file.exists()) return null
+            file.readBytes()
+        } catch (e: Exception) {
+            Log.e(TAG, "readFile error: ${e.message}")
+            null
+        }
+    }
+
     override fun isAlive(): Boolean = true
 
     /**

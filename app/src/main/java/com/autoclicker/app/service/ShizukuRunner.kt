@@ -117,5 +117,15 @@ class ShizukuRunner(private val context: Context) : ICommandRunner {
         }
     }
 
+    override fun readFile(path: String): ByteArray? {
+        val service = shellService ?: return null
+        return try {
+            service.readFile(path)
+        } catch (e: Exception) {
+            Log.e(TAG, "readFile error: ${e.message}")
+            null
+        }
+    }
+
     override fun getPermissionType(): String = "Shizuku"
 }
