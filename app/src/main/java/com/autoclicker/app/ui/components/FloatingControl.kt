@@ -1,166 +1,317 @@
 package com.autoclicker.app.ui.components
 
-import android.app.*
 import android.content.Context
-import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.view.Gravity
-import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.autoclicker.app.AutoClickerApp
-import com.autoclicker.app.MainActivity
-import com.autoclicker.app.service.ClickService
+import com.autoclicker.app.R
 
 /**
- * 悬浮窗控制面板
- * 提供快捷的开始/停止和录制功能
+ * 悬浮窗控制 (悬浮球 + 控制面板)
+ *
+ * 功能:
+ * - 悬浮球可自由拖动
+ * - 点击悬浮球弹出/收起控制面板
+ * - 面板提供: 开始/停止、快速点击、快速滑动、录制、关闭悬浮窗
  */
-class FloatingControl(private val context: Context) {
+class FloatingControl(
+    private val context: Context,
+    private val callbacks: Callbacks
+) {
+
+    /** 回调接口, 由 MainActivity 实现 */
+    interface Callbacks {
+        fun onToggleRun()
+        fun onQuickTap()
+        fun onQuickSwipe()
+        fun onRecord()
+        fun onOpenApp()
+    }
 
     private var windowManager: WindowManager? = null
-    private var floatingView: View? = null
-    private var controlPanel: View? = null
-    private var isPanelShown = false
 
+    // 悬浮球
+    private var floatingBall: View? = null
+    private var ballParams: WindowManager.LayoutParams? = null
+
+    // 控制面板
+    private var panelView: View? = null
+    private var panelParams: WindowManager.LayoutParams? = null
+    private var panelVisible = false
+
+    // 面板内控件引用
+    private var statusText: TextView? = null
+    private var runButtonText: TextView? = null
+
+    private var isDragging = false
+
+    /** 显示悬浮球 */
     fun show() {
-        if (floatingView != null) return
-
+        if (floatingBall != null) return
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-        // 创建主悬浮按钮
-        floatingView = LinearLayout(context).apply {
-            gravity = Gravity.CENTER
-            setPadding(16, 16, 16, 16)
-            setBackgroundColor(0xFF0061A4.toInt())
-            // 使用简单文字视图代替
-            val textView = TextView(context).apply {
-                text = "⚡"
-                textSize = 20f
-                setTextColor(0xFFFFFFFF.toInt())
-                gravity = Gravity.CENTER
-            }
-            addView(textView)
+        // 悬浮球: 圆形 ⚡ 按钮
+        floatingBall = ImageView(context).apply {
+            setImageResource(R.drawable.ic_ball)
+            setBackgroundResource(R.drawable.bg_floating_ball)
+            contentDescription = "连点器悬浮球"
         }
 
-        val params = WindowManager.LayoutParams(
-            120,
-            120,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
+        ballParams = WindowManager.LayoutParams(
+            dp(52), dp(52),
+            windowType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 100
-            y = 300
+            x = dp(16)
+            y = dp(320)
         }
 
-        floatingView?.setOnClickListener {
-            toggleControlPanel()
-        }
-
-        // 添加拖拽功能
-        setupDrag(floatingView!!, params)
-
-        windowManager?.addView(floatingView, params)
-    }
-
-    private fun setupDrag(view: View, params: WindowManager.LayoutParams) {
-        var initialX = 0
-        var initialY = 0
-        var initialTouchX = 0f
-        var initialTouchY = 0f
-        var isDragging = false
-
-        view.setOnTouchListener { _, event ->
+        // 点击/拖拽
+        floatingBall?.setOnTouchListener { view, event ->
             when (event.action) {
-                android.view.MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
+                MotionEvent.ACTION_DOWN -> {
                     isDragging = false
+                    startX = event.rawX
+                    startY = event.rawY
+                    startLeft = ballParams!!.x
+                    startTop = ballParams!!.y
                     true
                 }
-                android.view.MotionEvent.ACTION_MOVE -> {
-                    val deltaX = (event.rawX - initialTouchX).toInt()
-                    val deltaY = (event.rawY - initialTouchY).toInt()
-                    if (kotlin.math.abs(deltaX) > 5 || kotlin.math.abs(deltaY) > 5) {
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - startX
+                    val dy = event.rawY - startY
+                    if (!isDragging && (kotlin.math.abs(dx) > 8 || kotlin.math.abs(dy) > 8)) {
                         isDragging = true
-                        params.x = initialX + deltaX
-                        params.y = initialY + deltaY
-                        windowManager?.updateViewLayout(view, params)
+                    }
+                    if (isDragging) {
+                        ballParams!!.x = (startLeft + dx).toInt()
+                        ballParams!!.y = (startTop + dy).toInt()
+                        windowManager?.updateViewLayout(view, ballParams)
                     }
                     true
                 }
-                android.view.MotionEvent.ACTION_UP -> {
+                MotionEvent.ACTION_UP -> {
                     if (!isDragging) {
-                        view.performClick()
+                        view.performClick()  // 触发 OnClickListener → togglePanel()
                     }
                     true
                 }
                 else -> false
             }
         }
+
+        floatingBall?.setOnClickListener { togglePanel() }
+        windowManager?.addView(floatingBall, ballParams)
     }
 
-    private fun toggleControlPanel() {
-        if (isPanelShown) {
-            hideControlPanel()
-        } else {
-            showControlPanel()
-        }
+    private var startX = 0f
+    private var startY = 0f
+    private var startLeft = 0
+    private var startTop = 0
+
+    /** 切换控制面板显示 */
+    private fun togglePanel() {
+        if (panelVisible) hidePanel() else showPanel()
     }
 
-    private fun showControlPanel() {
-        if (controlPanel != null) return
+    /** 显示控制面板 */
+    private fun showPanel() {
+        if (panelView != null) return
 
-        controlPanel = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 24, 24, 24)
-            setBackgroundColor(0xFF1A1C1E.toInt())
-            alpha = 0.95f
-        }
-
-        val panelParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
+        panelView = buildPanel()
+        panelParams = WindowManager.LayoutParams(
+            dp(280), WindowManager.LayoutParams.WRAP_CONTENT,
+            windowType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            // 放在悬浮球旁边
+            val bx = ballParams?.x ?: dp(16)
+            val by = ballParams?.y ?: dp(320)
+            x = if (bx + dp(280) > getScreenWidth()) bx - dp(280) else bx + dp(60)
+            y = (by - dp(120)).coerceAtLeast(dp(10))
+        }
+
+        windowManager?.addView(panelView, panelParams)
+        panelVisible = true
+    }
+
+    /** 隐藏控制面板 */
+    private fun hidePanel() {
+        panelView?.let {
+            try { windowManager?.removeView(it) } catch (_: Exception) {}
+        }
+        panelView = null
+        panelVisible = false
+    }
+
+    /** 构建面板视图 */
+    private fun buildPanel(): View {
+        val panel = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            setBackgroundResource(R.drawable.bg_panel)
+            elevation = dp(8).toFloat()
+        }
+
+        // 标题行: 标题 + 收起
+        val titleRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        titleRow.addView(TextView(context).apply {
+            text = "连点器"
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            isAllCaps = false
+            layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f)
+        })
+        titleRow.addView(makeTextButton("×", 32f) {
+            hidePanel()
+        })
+        panel.addView(titleRow)
+
+        // 状态文本
+        statusText = TextView(context).apply {
+            text = "状态: 就绪"
+            textSize = 13f
+            setTextColor(0xFFB0BEC5.toInt())
+            setPadding(0, dp(4), 0, dp(8))
+        }
+        panel.addView(statusText)
+
+        // 分隔线
+        panel.addView(divider())
+
+        // 按钮列表
+        runButtonText = null
+        panel.addView(makePanelButton("▶ 开始脚本") {
+            callbacks.onToggleRun()
+        }.also { runButtonText = it })
+
+        panel.addView(makePanelButton("👆 快速点击") {
+            hidePanel()
+            callbacks.onQuickTap()
+        })
+
+        panel.addView(makePanelButton("↔ 快速滑动") {
+            hidePanel()
+            callbacks.onQuickSwipe()
+        })
+
+        panel.addView(makePanelButton("● 录制脚本") {
+            hidePanel()
+            callbacks.onRecord()
+        })
+
+        panel.addView(makePanelButton("☰ 打开应用") {
+            hidePanel()
+            callbacks.onOpenApp()
+        })
+
+        // 底部按钮行
+        val bottomRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        bottomRow.addView(makeTextButton("收起", 13f) { hidePanel() }.also {
+            it.layoutParams = LinearLayout.LayoutParams(0, dp(36), 1f)
+        })
+        bottomRow.addView(makeTextButton("关闭悬浮窗", 13f) { hide() }.also {
+            it.layoutParams = LinearLayout.LayoutParams(0, dp(36), 1f)
+        })
+        panel.addView(bottomRow)
+
+        return panel
+    }
+
+    /** 创建面板主按钮 */
+    private fun makePanelButton(label: String, onClick: () -> Unit): TextView {
+        return TextView(context).apply {
+            text = label
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), 0, dp(14), 0)
+            setBackgroundResource(R.drawable.bg_panel_button)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(44)
+            ).apply { bottomMargin = dp(8) }
+            setOnClickListener { onClick() }
+        }
+    }
+
+    /** 创建小文字按钮 */
+    private fun makeTextButton(label: String, size: Float, onClick: () -> Unit): TextView {
+        return TextView(context).apply {
+            text = label
+            textSize = size
+            setTextColor(0xFF80D8FF.toInt())
             gravity = Gravity.CENTER
+            setPadding(dp(10), 0, dp(10), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, dp(36)
+            )
+            setOnClickListener { onClick() }
         }
-
-        // 暂时只提示：悬浮控制面板需要通过 Compose 完全重写
-        // 当前简化版本直接显示按钮
-        windowManager?.addView(controlPanel, panelParams)
-        isPanelShown = true
     }
 
-    private fun hideControlPanel() {
-        controlPanel?.let {
-            windowManager?.removeView(it)
-            controlPanel = null
+    /** 分隔线 */
+    private fun divider(): View {
+        return View(context).apply {
+            setBackgroundColor(0x33FFFFFF.toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1
+            ).apply { topMargin = dp(4); bottomMargin = dp(10) }
         }
-        isPanelShown = false
     }
 
+    /**
+     * 更新运行状态 (面板与悬浮球)
+     */
+    fun setRunning(running: Boolean) {
+        runButtonText?.text = if (running) "■ 停止脚本" else "▶ 开始脚本"
+        statusText?.text = if (running) "状态: 脚本运行中..." else "状态: 就绪"
+    }
+
+    /**
+     * 更新状态文本
+     */
+    fun updateStatus(text: String) {
+        statusText?.text = text
+    }
+
+    private fun windowType(): Int {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+    }
+
+    private fun getScreenWidth(): Int {
+        val dm = context.resources.displayMetrics
+        return dm.widthPixels
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * context.resources.displayMetrics.density).toInt()
+    }
+
+    /** 移除悬浮窗 */
     fun hide() {
-        hideControlPanel()
-        floatingView?.let {
-            windowManager?.removeView(it)
-            floatingView = null
+        hidePanel()
+        floatingBall?.let {
+            try { windowManager?.removeView(it) } catch (_: Exception) {}
+            floatingBall = null
         }
         windowManager = null
     }

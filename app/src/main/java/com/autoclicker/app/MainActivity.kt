@@ -21,6 +21,7 @@ import com.autoclicker.app.data.ScriptRepository
 import com.autoclicker.app.service.ClickService
 import com.autoclicker.app.service.RootRunner
 import com.autoclicker.app.service.ShizukuRunner
+import com.autoclicker.app.ui.components.FloatingControl
 import com.autoclicker.app.ui.screens.HomeScreen
 import com.autoclicker.app.ui.screens.RecordScreen
 import com.autoclicker.app.ui.screens.SettingsScreen
@@ -34,6 +35,19 @@ class MainActivity : ComponentActivity() {
     private val scripts = mutableStateListOf<Script>()
     private var permissionType by mutableStateOf("检测中...")
     private var runningScriptId by mutableStateOf<String?>(null)
+
+    // 悬浮窗
+    private var floatingControl: FloatingControl? = null
+
+    // 悬浮窗权限请求
+    private val overlayPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, "悬浮窗权限已获取", Toast.LENGTH_SHORT).show()
+            showFloatingControl()
+        }
+    }
 
     // Shizuku 权限请求
     private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
@@ -127,6 +141,7 @@ class MainActivity : ComponentActivity() {
         if (ClickService.isRunning) {
             stopClickService()
             runningScriptId = null
+            floatingControl?.setRunning(false)
         } else {
             if (!hasAnyPermission()) {
                 requestPermissions()
@@ -134,6 +149,7 @@ class MainActivity : ComponentActivity() {
             }
             startClickService(script)
             runningScriptId = script.id
+            floatingControl?.setRunning(true)
         }
     }
 
@@ -224,9 +240,81 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkOverlayPermission() {
+        // 检查并申请悬浮窗权限
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            // 悬浮窗权限稍后按需请求
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            overlayPermissionLauncher.launch(intent)
+        } else {
+            showFloatingControl()
         }
+    }
+
+    /** 显示悬浮球控制 */
+    private fun showFloatingControl() {
+        if (floatingControl == null) {
+            floatingControl = FloatingControl(applicationContext, object : FloatingControl.Callbacks {
+                override fun onToggleRun() {
+                    runOnUiThread {
+                        if (ClickService.isRunning) {
+                            // 停止运行
+                            stopClickService()
+                            runningScriptId = null
+                            floatingControl?.setRunning(false)
+                        } else if (scripts.isNotEmpty()) {
+                            // 执行第一个脚本
+                            if (!hasAnyPermission()) {
+                                requestPermissions()
+                                Toast.makeText(this@MainActivity, "请先授权 Shizuku 或 Root", Toast.LENGTH_SHORT).show()
+                                return@runOnUiThread
+                            }
+                            startClickService(scripts.first())
+                            runningScriptId = scripts.first().id
+                            floatingControl?.setRunning(true)
+                        } else {
+                            Toast.makeText(this@MainActivity, "暂无脚本, 请先录制", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+
+                override fun onQuickTap() {
+                    runOnUiThread {
+                        // 打开主界面并弹出快速点击对话框
+                        openApp()
+                        Toast.makeText(this@MainActivity, "请在主界面配置快速点击", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onQuickSwipe() {
+                    runOnUiThread {
+                        openApp()
+                        Toast.makeText(this@MainActivity, "请在主界面配置快速滑动", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onRecord() {
+                    runOnUiThread {
+                        openApp()
+                        Toast.makeText(this@MainActivity, "请在主界面点击\"录制脚本\"", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onOpenApp() {
+                    runOnUiThread { openApp() }
+                }
+            })
+        }
+        floatingControl?.show()
+    }
+
+    /** 打开主界面 */
+    private fun openApp() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        startActivity(intent)
     }
 
     private fun requestPermissions() {
@@ -256,10 +344,15 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         updatePermissionStatus()
         runningScriptId = ClickService.currentScript?.id
+        // 更新悬浮面板状态
+        floatingControl?.setRunning(ClickService.isRunning)
+        floatingControl?.updateStatus("权限: $permissionType")
     }
 
     override fun onDestroy() {
         super.onDestroy()
         Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+        floatingControl?.hide()
+        floatingControl = null
     }
 }
