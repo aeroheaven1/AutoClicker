@@ -18,7 +18,7 @@ import java.io.InputStreamReader
  * 2. 不能被混淆 (见 proguard-rules.pro)
  * 3. 通过 Shizuku.bindUserService 绑定
  */
-class ShellUserService : IShellService.Stub() {
+class ShellUserService : IShellService.Stub {
 
     companion object {
         private const val TAG = "ShellUserService"
