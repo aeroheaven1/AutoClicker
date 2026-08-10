@@ -210,11 +210,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun hasAnyPermission(): Boolean {
-        return ShizukuRunner().isAvailable() || RootRunner().isAvailable()
+        return ShizukuRunner(applicationContext).isAvailable() || RootRunner().isAvailable()
     }
 
     private fun updatePermissionStatus() {
-        val shizuku = ShizukuRunner()
+        val shizuku = ShizukuRunner(applicationContext)
         val root = RootRunner()
         permissionType = when {
             shizuku.isAvailable() -> "Shizuku ✓"
@@ -231,7 +231,7 @@ class MainActivity : ComponentActivity() {
 
     private fun requestPermissions() {
         // 先尝试 Shizuku
-        if (!ShizukuRunner().isAvailable()) {
+        if (!ShizukuRunner(applicationContext).isAvailable()) {
             try {
                 Shizuku.requestPermission(0)
             } catch (e: Exception) {

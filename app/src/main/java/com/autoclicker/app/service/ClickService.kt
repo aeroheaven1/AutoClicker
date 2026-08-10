@@ -123,7 +123,7 @@ class ClickService : Service() {
         startForegroundNotification()
 
         // 选择最佳权限方式
-        val shizukuRunner = ShizukuRunner()
+        val shizukuRunner = ShizukuRunner(this)
         val rootRunner = RootRunner()
         runner = when {
             shizukuRunner.isAvailable() -> {
@@ -206,7 +206,7 @@ class ClickService : Service() {
         duration: Long,
         repeat: Int
     ) {
-        val shizukuRunner = ShizukuRunner()
+        val shizukuRunner = ShizukuRunner(this)
         val rootRunner = RootRunner()
         val r = when {
             shizukuRunner.isAvailable() -> shizukuRunner

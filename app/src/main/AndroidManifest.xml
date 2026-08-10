@@ -35,6 +35,12 @@
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 
+        <!-- Shizuku 用户服务: 在 shell 权限下执行命令 -->
+        <service
+            android:name=".service.ShellUserService"
+            android:exported="true"
+            android:permission="moe.shizuku.manager.permission.API_V23" />
+
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"

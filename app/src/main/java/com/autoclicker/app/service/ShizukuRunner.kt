@@ -1,80 +1,92 @@
 package com.autoclicker.app.service
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.os.IBinder
+import android.util.Log
 import rikka.shizuku.Shizuku
-import java.io.BufferedReader
-import java.io.InputStreamReader
 
 /**
  * Shizuku 权限命令执行器
- * 通过 Shizuku 用户服务执行 shell 命令
+ * 通过 Shizuku 用户服务 (ShellUserService) 以 shell 权限执行命令
  */
-class ShizukuRunner : ICommandRunner {
+class ShizukuRunner(private val context: Context) : ICommandRunner {
+
+    companion object {
+        private const val TAG = "ShizukuRunner"
+        private const val BIND_TIMEOUT_MS = 5000L
+    }
+
+    @Volatile
+    private var shellService: IShellService? = null
+
+    private val binderLock = Any()
+
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+            synchronized(binderLock) {
+                shellService = IShellService.Stub.asInterface(binder)
+                Log.d(TAG, "Shizuku user service connected")
+                (binderLock as java.lang.Object).notifyAll()
+            }
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            synchronized(binderLock) {
+                shellService = null
+                Log.d(TAG, "Shizuku user service disconnected")
+            }
+        }
+    }
+
+    private fun ensureBound() {
+        if (shellService != null) return
+        try {
+            val args = Shizuku.UserServiceArgs(
+                ComponentName(context, ShellUserService::class.java)
+            )
+            val result = Shizuku.bindUserService(args, connection)
+            Log.d(TAG, "bindUserService result: $result")
+        } catch (e: Exception) {
+            Log.e(TAG, "bindUserService error: ${e.message}")
+        }
+    }
+
+    private fun waitForService(timeoutMs: Long): IShellService? {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        synchronized(binderLock) {
+            while (shellService == null && System.currentTimeMillis() < deadline) {
+                try {
+                    (binderLock as java.lang.Object).wait(deadline - System.currentTimeMillis())
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                }
+            }
+            return shellService
+        }
+    }
 
     override fun isAvailable(): Boolean {
         return try {
-            Shizuku.checkSelfPermission() == 0 ||
-                    Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
         } catch (e: Exception) {
             false
         }
     }
 
     override fun exec(command: String): String {
-        return try {
-            tryExecViaShizuku(command)
-        } catch (e: Exception) {
-            fallbackExec(command)
-        }
-    }
-
-    private fun tryExecViaShizuku(command: String): String {
-        return try {
-            val process = Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val errorReader = BufferedReader(InputStreamReader(process.errorStream))
-            val output = reader.readText()
-            val error = errorReader.readText()
-            reader.close()
-            errorReader.close()
-            process.waitFor()
-            process.destroy()
-            if (output.isNotEmpty()) output else error
-        } catch (e: Exception) {
-            throw e
-        }
-    }
-
-    private fun fallbackExec(command: String): String {
-        return try {
-            val process = Runtime.getRuntime().exec(command)
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val errorReader = BufferedReader(InputStreamReader(process.errorStream))
-            val output = reader.readText()
-            val error = errorReader.readText()
-            reader.close()
-            errorReader.close()
-            process.waitFor()
-            process.destroy()
-            if (output.isNotEmpty()) output else error
-        } catch (e: Exception) {
-            "Shizuku Error: ${e.message}"
-        }
+        ensureBound()
+        val service = waitForService(BIND_TIMEOUT_MS)
+        return service?.exec(command) ?: "Error: Shizuku 服务未绑定或超时"
     }
 
     override fun execAsync(command: String) {
-        Thread {
-            try {
-                val process = Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
-                process.waitFor()
-                process.destroy()
-            } catch (e: Exception) {
-                try {
-                    val process = Runtime.getRuntime().exec(command)
-                    process.waitFor()
-                    process.destroy()
-                } catch (_: Exception) {}
-            }
-        }.start()
+        ensureBound()
+        val service = waitForService(BIND_TIMEOUT_MS)
+        service?.execAsync(command)
     }
 
     override fun getPermissionType(): String = "Shizuku"
