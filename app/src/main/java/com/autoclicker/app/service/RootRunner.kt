@@ -77,7 +77,7 @@ class RootRunner : ICommandRunner {
             streamThread = Thread {
                 try {
                     val reader = BufferedReader(InputStreamReader(process.inputStream))
-                    var line: String?
+                    var line: String? = null
                     while (process.isAlive && reader.readLine().also { line = it } != null) {
                         val text = line
                         if (text != null && text.isNotEmpty()) {
