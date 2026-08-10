@@ -309,6 +309,10 @@ class ClickService : Service() {
             ActionType.LONG_PRESS -> {
                 "input swipe ${action.x.toInt()} ${action.y.toInt()} ${action.x.toInt()} ${action.y.toInt()} ${action.duration}"
             }
+            ActionType.FIND_TEXT -> {
+                // FIND_TEXT 在 executeFindText 中处理
+                ""
+            }
             ActionType.DELAY -> {
                 // DELAY 类型在 executeSingleAction 的 delay 中处理
                 ""

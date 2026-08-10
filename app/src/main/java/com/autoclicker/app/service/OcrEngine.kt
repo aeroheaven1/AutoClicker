@@ -37,7 +37,7 @@ class OcrEngine(
             "https://ghproxy.net/https://github.com/tesseract-ocr/tessdata_fast/raw/main/{lang}.traineddata"
         )
 
-        const val MODELS = arrayOf("chi_sim", "eng")
+        val MODELS = arrayOf("chi_sim", "eng")
     }
 
     /** 模型下载进度回调 */
@@ -138,13 +138,13 @@ class OcrEngine(
         return try {
             val api = TessBaseAPI()
             if (api.init(context.filesDir.absolutePath, LANG)) {
-                api.pageSegMode = TessBaseAPI.PageSegMode.PSM_SINGLE_BLOCK
+                api.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_BLOCK)
                 tessAPI = api
                 Log.d(TAG, "Tesseract initialized")
                 true
             } else {
                 Log.e(TAG, "Tesseract init failed")
-                api.recycle()
+                api.end()
                 false
             }
         } catch (e: Exception) {
@@ -176,21 +176,34 @@ class OcrEngine(
         val api = tessAPI ?: return emptyList()
         return try {
             api.setImage(bitmap)
-            val words = api.words
-            words?.mapNotNull { w ->
-                val box = w.boundingBox
-                if (box != null && w.text.isNotBlank()) {
-                    OcrWord(
-                        text = w.text.trim(),
-                        x = box.left,
-                        y = box.top,
-                        width = box.width(),
-                        height = box.height(),
-                        centerX = box.centerX(),
-                        centerY = box.centerY()
-                    )
-                } else null
-            } ?: emptyList()
+            val result = mutableListOf<OcrWord>()
+            val iterator = api.resultIterator
+            iterator.begin()
+            do {
+                val text = iterator.getUTF8Text(TessBaseAPI.PageIteratorLevel.RIL_WORD)?.trim() ?: ""
+                if (text.isNotEmpty()) {
+                    val box = iterator.getBoundingBox(TessBaseAPI.PageIteratorLevel.RIL_WORD)
+                    if (box != null && box.size >= 4) {
+                        val left = box[0]
+                        val top = box[1]
+                        val right = box[2]
+                        val bottom = box[3]
+                        result.add(
+                            OcrWord(
+                                text = text,
+                                x = left,
+                                y = top,
+                                width = right - left,
+                                height = bottom - top,
+                                centerX = (left + right) / 2,
+                                centerY = (top + bottom) / 2
+                            )
+                        )
+                    }
+                }
+            } while (iterator.next(TessBaseAPI.PageIteratorLevel.RIL_WORD))
+            iterator.delete()
+            result
         } catch (e: Exception) {
             Log.e(TAG, "recognize error: ${e.message}")
             emptyList()
@@ -218,7 +231,7 @@ class OcrEngine(
     }
 
     fun release() {
-        tessAPI?.recycle()
+        tessAPI?.end()
         tessAPI = null
     }
 }

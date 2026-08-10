@@ -140,7 +140,7 @@ fun HomeScreen(
                         }
                         // 屏幕取点
                         FilledTonalButton(
-                            onClick = { onPickTap { x, y -> onQuickTap(x, y, 100L, 1) } },
+                            onClick = { pickerActions.pickTap { x, y -> onQuickTap(x, y, 100L, 1) } },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
