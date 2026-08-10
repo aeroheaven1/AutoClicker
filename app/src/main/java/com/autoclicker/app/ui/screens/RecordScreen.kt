@@ -29,6 +29,7 @@ fun RecordScreen(
     var repeatCount by remember { mutableIntStateOf(1) }
     var actionInterval by remember { mutableLongStateOf(100L) }
     var repeatInterval by remember { mutableLongStateOf(500L) }
+    var speedFactor by remember { mutableStateOf("1.0") }
     var showSettings by remember { mutableStateOf(false) }
     var elapsedTime by remember { mutableLongStateOf(0L) }
 
@@ -158,6 +159,7 @@ fun RecordScreen(
                     // 手动添加动作
                     if (!isRecording) {
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             AssistChip(
@@ -180,6 +182,23 @@ fun RecordScreen(
                                 label = { Text("+ 滑动") },
                                 leadingIcon = {
                                     Icon(Icons.Default.Swipe, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AssistChip(
+                                onClick = {
+                                    recordedActions.add(
+                                        ScriptAction(type = ActionType.RANDOM_TAP, x = 300f, y = 600f, x2 = 700f, y2 = 1400f)
+                                    )
+                                },
+                                label = { Text("+ 随机点击") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(16.dp))
                                 }
                             )
                             AssistChip(
@@ -237,6 +256,14 @@ fun RecordScreen(
                             value = repeatInterval.toString(),
                             onValueChange = { repeatInterval = it.filter { c -> c.isDigit() }.toLongOrNull() ?: 500L },
                             label = { Text("循环间隔(ms)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = speedFactor,
+                            onValueChange = { speedFactor = it.filter { c -> c.isDigit() || c == '.' } },
+                            label = { Text("速度倍率 (0.25~5.0)") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -306,7 +333,8 @@ fun RecordScreen(
                         actions = recordedActions.toMutableList(),
                         repeatCount = repeatCount,
                         intervalBetweenActions = actionInterval,
-                        intervalBetweenRepeats = repeatInterval
+                        intervalBetweenRepeats = repeatInterval,
+                        speedFactor = speedFactor.toFloatOrNull()?.coerceIn(0.25f, 5f) ?: 1.0f
                     )
                     onSaveScript(script)
                     showSaveDialog = false
@@ -355,6 +383,7 @@ fun ActionItem(
             Icon(
                 imageVector = when (action.type) {
                     ActionType.TAP -> Icons.Default.TouchApp
+                    ActionType.RANDOM_TAP -> Icons.Default.Shuffle
                     ActionType.SWIPE -> Icons.Default.Swipe
                     ActionType.LONG_PRESS -> Icons.Default.TouchApp
                     ActionType.DELAY -> Icons.Default.Timer
@@ -371,6 +400,7 @@ fun ActionItem(
                 Text(
                     text = when (action.type) {
                         ActionType.TAP -> "点击 (${action.x.toInt()}, ${action.y.toInt()})"
+                        ActionType.RANDOM_TAP -> "随机点击 (${action.x.toInt()},${action.y.toInt()})~(${action.x2.toInt()},${action.y2.toInt()})"
                         ActionType.SWIPE -> "滑动 (${action.x.toInt()},${action.y.toInt()}) → (${action.x2.toInt()},${action.y2.toInt()})"
                         ActionType.LONG_PRESS -> "长按 (${action.x.toInt()}, ${action.y.toInt()}) ${action.duration}ms"
                         ActionType.DELAY -> "等待 ${action.delay}ms"
@@ -430,7 +460,43 @@ fun EditActionDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("类型: ${action.type.name}", style = MaterialTheme.typography.labelLarge)
 
-                if (action.type != ActionType.DELAY) {
+                if (action.type == ActionType.RANDOM_TAP) {
+                    // 随机区域: 左上角 + 右下角
+                    Text("区域左上角", style = MaterialTheme.typography.labelSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = x,
+                            onValueChange = { x = it.filter { c -> c.isDigit() || c == '.' } },
+                            label = { Text("左上X") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = y,
+                            onValueChange = { y = it.filter { c -> c.isDigit() || c == '.' } },
+                            label = { Text("左上Y") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Text("区域右下角", style = MaterialTheme.typography.labelSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = x2,
+                            onValueChange = { x2 = it.filter { c -> c.isDigit() || c == '.' } },
+                            label = { Text("右下X") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = y2,
+                            onValueChange = { y2 = it.filter { c -> c.isDigit() || c == '.' } },
+                            label = { Text("右下Y") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                } else if (action.type != ActionType.DELAY) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = x,
@@ -476,7 +542,7 @@ fun EditActionDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
-                } else if (action.type != ActionType.TAP) {
+                } else if (action.type != ActionType.TAP && action.type != ActionType.RANDOM_TAP) {
                     OutlinedTextField(
                         value = duration,
                         onValueChange = { duration = it.filter { c -> c.isDigit() } },

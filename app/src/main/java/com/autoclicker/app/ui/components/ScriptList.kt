@@ -157,6 +157,7 @@ fun ScriptCard(
 fun ActionChip(action: com.autoclicker.app.data.ScriptAction) {
     val (icon, label) = when (action.type) {
         ActionType.TAP -> Icons.Default.TouchApp to "点击(${action.x.toInt()},${action.y.toInt()})"
+        ActionType.RANDOM_TAP -> Icons.Default.Shuffle to "随机点击"
         ActionType.SWIPE -> Icons.Default.Swipe to "滑动"
         ActionType.LONG_PRESS -> Icons.Default.TouchApp to "长按(${action.x.toInt()},${action.y.toInt()})"
         ActionType.DELAY -> Icons.Default.Timer to "等待${action.delay}ms"

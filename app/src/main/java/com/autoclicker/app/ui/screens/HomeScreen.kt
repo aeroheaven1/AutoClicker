@@ -16,6 +16,15 @@ import com.autoclicker.app.data.Script
 import com.autoclicker.app.data.ScriptAction
 import com.autoclicker.app.ui.components.ScriptListView
 
+/**
+ * 屏幕取点动作 (由 MainActivity 提供实现)
+ */
+class CoordinatePickerActions(
+    val pickTap: ((Float, Float) -> Unit) -> Unit,
+    val pickSwipeStart: ((Float, Float) -> Unit) -> Unit,
+    val pickSwipeEnd: ((Float, Float) -> Unit) -> Unit
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -28,7 +37,8 @@ fun HomeScreen(
     onNavigateToRecord: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onQuickTap: (Float, Float, Long, Int) -> Unit,
-    onQuickSwipe: (Float, Float, Float, Float, Long, Int) -> Unit
+    onQuickSwipe: (Float, Float, Float, Float, Long, Int) -> Unit,
+    pickerActions: CoordinatePickerActions
 ) {
     var showQuickTapDialog by remember { mutableStateOf(false) }
     var showQuickSwipeDialog by remember { mutableStateOf(false) }
@@ -132,6 +142,7 @@ fun HomeScreen(
     if (showQuickTapDialog) {
         QuickTapDialog(
             onDismiss = { showQuickTapDialog = false },
+            onPick = pickerActions.pickTap,
             onExecute = { x, y, duration, repeat ->
                 onQuickTap(x, y, duration, repeat)
                 showQuickTapDialog = false
@@ -143,6 +154,8 @@ fun HomeScreen(
     if (showQuickSwipeDialog) {
         QuickSwipeDialog(
             onDismiss = { showQuickSwipeDialog = false },
+            onPickStart = pickerActions.pickSwipeStart,
+            onPickEnd = pickerActions.pickSwipeEnd,
             onExecute = { x1, y1, x2, y2, duration, repeat ->
                 onQuickSwipe(x1, y1, x2, y2, duration, repeat)
                 showQuickSwipeDialog = false
@@ -180,6 +193,7 @@ fun HomeScreen(
 @Composable
 fun QuickTapDialog(
     onDismiss: () -> Unit,
+    onPick: ((Float, Float) -> Unit) -> Unit,
     onExecute: (Float, Float, Long, Int) -> Unit
 ) {
     var xText by remember { mutableStateOf("500") }
@@ -193,6 +207,20 @@ fun QuickTapDialog(
         title = { Text("快速点击") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // 屏幕选取按钮
+                OutlinedButton(
+                    onClick = {
+                        onPick { x, y ->
+                            xText = x.toInt().toString()
+                            yText = y.toInt().toString()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("🎯 从屏幕选取坐标")
+                }
                 OutlinedTextField(
                     value = xText,
                     onValueChange = { xText = it.filter { c -> c.isDigit() || c == '.' } },
@@ -224,7 +252,7 @@ fun QuickTapDialog(
                     )
                 }
                 Text(
-                    text = "提示: 可在开发者选项中开启\"指针位置\"查看坐标",
+                    text = "提示: 也可点击\"从屏幕选取坐标\"直接点选, 无需开发者模式",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -250,6 +278,8 @@ fun QuickTapDialog(
 @Composable
 fun QuickSwipeDialog(
     onDismiss: () -> Unit,
+    onPickStart: ((Float, Float) -> Unit) -> Unit,
+    onPickEnd: ((Float, Float) -> Unit) -> Unit,
     onExecute: (Float, Float, Float, Float, Long, Int) -> Unit
 ) {
     var x1Text by remember { mutableStateOf("100") }
@@ -281,6 +311,17 @@ fun QuickSwipeDialog(
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
+                    OutlinedButton(
+                        onClick = {
+                            onPickStart { x, y ->
+                                x1Text = x.toInt().toString()
+                                y1Text = y.toInt().toString()
+                            }
+                        },
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
                 }
                 Text("终点坐标", style = MaterialTheme.typography.labelLarge)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -298,6 +339,17 @@ fun QuickSwipeDialog(
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
+                    OutlinedButton(
+                        onClick = {
+                            onPickEnd { x, y ->
+                                x2Text = x.toInt().toString()
+                                y2Text = y.toInt().toString()
+                            }
+                        },
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
@@ -315,6 +367,11 @@ fun QuickSwipeDialog(
                         modifier = Modifier.weight(1f)
                     )
                 }
+                Text(
+                    text = "提示: 点击🎯按钮可直接在屏幕上选取起点/终点",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
             }
         },
         confirmButton = {

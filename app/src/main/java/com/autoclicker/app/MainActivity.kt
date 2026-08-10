@@ -22,6 +22,7 @@ import com.autoclicker.app.service.ClickService
 import com.autoclicker.app.service.RootRunner
 import com.autoclicker.app.service.ShizukuRunner
 import com.autoclicker.app.service.TouchEventRecorder
+import com.autoclicker.app.ui.components.CoordinatePicker
 import com.autoclicker.app.ui.components.FloatingControl
 import com.autoclicker.app.ui.screens.HomeScreen
 import com.autoclicker.app.ui.screens.RecordScreen
@@ -43,6 +44,9 @@ class MainActivity : ComponentActivity() {
     // 屏幕录制状态
     private var isRecording = false
     private var recorder: TouchEventRecorder? = null
+
+    // 坐标拾取器
+    private var coordinatePicker: CoordinatePicker? = null
 
     // 悬浮窗权限请求
     private val overlayPermissionLauncher = registerForActivityResult(
@@ -119,7 +123,12 @@ class MainActivity : ComponentActivity() {
                 },
                 onQuickSwipe = { x1, y1, x2, y2, duration, repeat ->
                     executeQuickAction("SWIPE", x1, y1, x2, y2, duration, repeat)
-                }
+                },
+                pickerActions = CoordinatePickerActions(
+                    pickTap = { cb -> startCoordinatePick(cb) },
+                    pickSwipeStart = { cb -> startCoordinatePick(cb) },
+                    pickSwipeEnd = { cb -> startCoordinatePick(cb) }
+                )
             )
             "record" -> RecordScreen(
                 onBack = { currentScreen = "home" },
@@ -312,6 +321,16 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                override fun onPickCoordinate() {
+                    runOnUiThread {
+                        startCoordinatePick { x, y ->
+                            // 取点后立即执行一次点击
+                            Toast.makeText(this@MainActivity, "坐标: ($x, $y) 已执行点击", Toast.LENGTH_SHORT).show()
+                            executeQuickAction("TAP", x, y, 0f, 0f, 100L, 1)
+                        }
+                    }
+                }
+
                 override fun onOpenApp() {
                     runOnUiThread { openApp() }
                 }
@@ -326,6 +345,22 @@ class MainActivity : ComponentActivity() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         startActivity(intent)
+    }
+
+    /**
+     * 启动屏幕取点模式
+     * @param onPicked 取到坐标后的回调
+     */
+    private fun startCoordinatePick(onPicked: (Float, Float) -> Unit) {
+        if (coordinatePicker?.isActive() == true) return
+        coordinatePicker?.stop()
+        coordinatePicker = CoordinatePicker(applicationContext) { x, y ->
+            runOnUiThread {
+                onPicked(x, y)
+            }
+        }
+        coordinatePicker?.start(CoordinatePicker.Mode.SINGLE)
+        Toast.makeText(this, "🎯 请点击屏幕选取坐标", Toast.LENGTH_SHORT).show()
     }
 
     /**

@@ -161,18 +161,21 @@ class ClickService : Service() {
         val r = runner ?: return
         var count = 0
         val maxRepeats = script.repeatCount
+        val speed = script.speedFactor.coerceIn(0.25f, 5f)
+        val actionInterval = (script.intervalBetweenActions / speed).toLong().coerceAtLeast(0)
+        val repeatInterval = (script.intervalBetweenRepeats / speed).toLong().coerceAtLeast(0)
 
         while (isRunning && (maxRepeats == 0 || count < maxRepeats)) {
             for (action in script.actions) {
                 if (!isRunning) break
-                executeSingleAction(r, action)
-                if (script.intervalBetweenActions > 0) {
-                    delay(script.intervalBetweenActions)
+                executeSingleAction(r, action, speed)
+                if (actionInterval > 0) {
+                    delay(actionInterval)
                 }
             }
             count++
-            if (script.intervalBetweenRepeats > 0 && (maxRepeats == 0 || count < maxRepeats)) {
-                delay(script.intervalBetweenRepeats)
+            if (repeatInterval > 0 && (maxRepeats == 0 || count < maxRepeats)) {
+                delay(repeatInterval)
             }
         }
 
@@ -185,11 +188,11 @@ class ClickService : Service() {
         }
     }
 
-    private suspend fun executeSingleAction(runner: ICommandRunner, action: ScriptAction) {
+    private suspend fun executeSingleAction(runner: ICommandRunner, action: ScriptAction, speed: Float = 1.0f) {
         // DELAY 类型: 仅等待
         if (action.type == ActionType.DELAY) {
             if (action.delay > 0) {
-                delay(action.delay)
+                delay((action.delay / speed).toLong().coerceAtLeast(0))
             }
             return
         }
@@ -201,7 +204,7 @@ class ClickService : Service() {
             }
             // 等待动作执行完成 (滑动/长按需要时间)
             if (action.duration > 0) {
-                delay(action.duration + 50)
+                delay((action.duration / speed).toLong().coerceAtLeast(0) + 50)
             }
         }
     }
@@ -248,6 +251,16 @@ class ClickService : Service() {
         return when (action.type) {
             ActionType.TAP -> {
                 "input tap ${action.x.toInt()} ${action.y.toInt()}"
+            }
+            ActionType.RANDOM_TAP -> {
+                // 在区域内随机取点
+                val minX = minOf(action.x, action.x2)
+                val maxX = maxOf(action.x, action.x2)
+                val minY = minOf(action.y, action.y2)
+                val maxY = maxOf(action.y, action.y2)
+                val rx = if (maxX > minX) (minX + Math.random() * (maxX - minX)).toInt() else minX.toInt()
+                val ry = if (maxY > minY) (minY + Math.random() * (maxY - minY)).toInt() else minY.toInt()
+                "input tap $rx $ry"
             }
             ActionType.SWIPE -> {
                 "input swipe ${action.x.toInt()} ${action.y.toInt()} ${action.x2.toInt()} ${action.y2.toInt()} ${action.duration}"

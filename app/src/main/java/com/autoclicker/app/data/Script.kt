@@ -11,7 +11,8 @@ enum class ActionType {
     TAP,        // 点击
     SWIPE,      // 滑动
     LONG_PRESS, // 长按
-    DELAY       // 延迟等待
+    DELAY,      // 延迟等待
+    RANDOM_TAP  // 随机区域点击 (x,y)-(x2,y2) 为区域范围
 }
 
 /**
@@ -21,8 +22,8 @@ data class ScriptAction(
     val type: ActionType,
     val x: Float = 0f,
     val y: Float = 0f,
-    val x2: Float = 0f,       // 滑动终点X
-    val y2: Float = 0f,       // 滑动终点Y
+    val x2: Float = 0f,       // 滑动终点X / 随机区域右下角X
+    val y2: Float = 0f,       // 滑动终点Y / 随机区域右下角Y
     val duration: Long = 100L, // 持续时间(ms) - 长按/滑动
     val delay: Long = 0L       // 延迟(ms) - DELAY类型使用
 )
@@ -37,6 +38,7 @@ data class Script(
     var repeatCount: Int = 1,           // 重复次数, 0=无限
     var intervalBetweenRepeats: Long = 500L, // 重复间隔(ms)
     var intervalBetweenActions: Long = 100L, // 动作间隔(ms)
+    var speedFactor: Float = 1.0f,      // 执行速度倍率 (0.25x~5x)
     val createdAt: Long = System.currentTimeMillis(),
     var updatedAt: Long = System.currentTimeMillis()
 ) {

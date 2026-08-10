@@ -33,6 +33,7 @@ class FloatingControl(
         fun onRecord()
         fun onOpenApp()
         fun onToggleRecord()
+        fun onPickCoordinate()
     }
 
     private var windowManager: WindowManager? = null
@@ -205,6 +206,12 @@ class FloatingControl(
         panel.addView(makePanelButton("● 开始录制") {
             callbacks.onToggleRecord()
         }.also { recordButtonText = it })
+
+        // 屏幕取点
+        panel.addView(makePanelButton("🎯 屏幕取点") {
+            hidePanel()
+            callbacks.onPickCoordinate()
+        })
 
         panel.addView(makePanelButton("👆 快速点击") {
             hidePanel()
