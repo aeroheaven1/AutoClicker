@@ -13,7 +13,9 @@ enum class ActionType {
     LONG_PRESS, // 长按
     DELAY,      // 延迟等待
     RANDOM_TAP, // 随机区域点击 (x,y)-(x2,y2) 为区域范围
-    FIND_TEXT   // 文字识别找字点击 (text 为要查找的文字)
+    FIND_TEXT,  // 文字识别找字点击 (text 为要查找的文字)
+    REPEAT_START, // 循环开始 (delay 字段存循环次数)
+    REPEAT_END    // 循环结束
 }
 
 /**

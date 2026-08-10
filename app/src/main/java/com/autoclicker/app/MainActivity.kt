@@ -27,6 +27,7 @@ import com.autoclicker.app.service.TouchEventRecorder
 import com.autoclicker.app.ui.components.CoordinatePicker
 import com.autoclicker.app.ui.components.FloatingControl
 import com.autoclicker.app.ui.screens.CoordinatePickerActions
+import com.autoclicker.app.ui.screens.FlowEditScreen
 import com.autoclicker.app.ui.screens.HomeScreen
 import com.autoclicker.app.ui.screens.OcrScreen
 import com.autoclicker.app.ui.screens.RecordScreen
@@ -54,6 +55,9 @@ class MainActivity : ComponentActivity() {
 
     // OCR 引擎
     private var ocrEngine: OcrEngine? = null
+
+    // 流程图编辑状态
+    private var editingScript by mutableStateOf<Script?>(null)
 
     // 悬浮窗权限请求
     private val overlayPermissionLauncher = registerForActivityResult(
@@ -121,11 +125,18 @@ class MainActivity : ComponentActivity() {
                 runningScriptId = runningScriptId,
                 permissionType = permissionType,
                 onPlayScript = { script -> handlePlayScript(script) },
-                onEditScript = { script -> handleEditScript(script) },
+                onEditScript = { script ->
+                    editingScript = script
+                    currentScreen = "flow"
+                },
                 onDeleteScript = { script -> handleDeleteScript(script) },
                 onNavigateToRecord = { currentScreen = "record" },
                 onNavigateToSettings = { currentScreen = "settings" },
                 onNavigateToOcr = { currentScreen = "ocr" },
+                onNavigateToFlow = {
+                    editingScript = null
+                    currentScreen = "flow"
+                },
                 onQuickTap = { x, y, duration, repeat ->
                     executeQuickAction("TAP", x, y, 0f, 0f, duration, repeat)
                 },
@@ -166,6 +177,17 @@ class MainActivity : ComponentActivity() {
                     words
                 },
                 onWordClicked = { word -> handleWordClicked(word) }
+            )
+            "flow" -> FlowEditScreen(
+                script = editingScript,
+                onBack = { currentScreen = "home" },
+                onSave = { saved ->
+                    lifecycleScope.launch {
+                        scriptRepository.saveScript(saved)
+                        Toast.makeText(this@MainActivity, "✓ 脚本已保存: ${saved.name}", Toast.LENGTH_SHORT).show()
+                        currentScreen = "home"
+                    }
+                }
             )
         }
     }

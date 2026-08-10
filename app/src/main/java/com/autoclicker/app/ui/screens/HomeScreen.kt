@@ -37,6 +37,7 @@ fun HomeScreen(
     onNavigateToRecord: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToOcr: () -> Unit,
+    onNavigateToFlow: () -> Unit,
     onQuickTap: (Float, Float, Long, Int) -> Unit,
     onQuickSwipe: (Float, Float, Float, Float, Long, Int) -> Unit,
     pickerActions: CoordinatePickerActions
@@ -146,6 +147,39 @@ fun HomeScreen(
                             Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("屏幕取点", style = MaterialTheme.typography.labelLarge)
+                        }
+                        // 流程图编辑
+                        FilledTonalButton(
+                            onClick = onNavigateToFlow,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.AccountTree, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("流程图", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // 屏幕录制提示
+                        FilledTonalButton(
+                            onClick = onNavigateToRecord,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.FiberManualRecord, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("动作录制", style = MaterialTheme.typography.labelLarge)
+                        }
+                        // 快捷入口占位: 悬浮窗说明
+                        FilledTonalButton(
+                            onClick = { showPermissionInfo = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("使用帮助", style = MaterialTheme.typography.labelLarge)
                         }
                     }
                 }

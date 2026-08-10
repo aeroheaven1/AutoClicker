@@ -169,13 +169,7 @@ class ClickService : Service() {
         val repeatInterval = (script.intervalBetweenRepeats / speed).toLong().coerceAtLeast(0)
 
         while (isRunning && (maxRepeats == 0 || count < maxRepeats)) {
-            for (action in script.actions) {
-                if (!isRunning) break
-                executeSingleAction(r, action, speed)
-                if (actionInterval > 0) {
-                    delay(actionInterval)
-                }
-            }
+            executeActions(r, script.actions, speed, actionInterval)
             count++
             if (repeatInterval > 0 && (maxRepeats == 0 || count < maxRepeats)) {
                 delay(repeatInterval)
@@ -190,6 +184,57 @@ class ClickService : Service() {
             stopSelf()
         }
     }
+
+    /**
+     * 执行动作列表, 支持 REPEAT_START/REPEAT_END 嵌套循环
+     */
+    private suspend fun executeActions(
+        runner: ICommandRunner,
+        actions: List<ScriptAction>,
+        speed: Float,
+        actionInterval: Long
+    ) {
+        // 循环栈: 保存循环开始位置和剩余次数
+        val loopStack = ArrayDeque<LoopFrame>()
+        var index = 0
+
+        while (index < actions.size && isRunning) {
+            val action = actions[index]
+            when (action.type) {
+                ActionType.REPEAT_START -> {
+                    val count = action.delay.toInt().coerceAtLeast(1)
+                    loopStack.addLast(LoopFrame(index, count))
+                    Log.d(TAG, "循环开始 x$count (位置 $index)")
+                }
+                ActionType.REPEAT_END -> {
+                    if (loopStack.isNotEmpty()) {
+                        val frame = loopStack.last()
+                        frame.remaining--
+                        if (frame.remaining > 0) {
+                            index = frame.startIndex // 回到循环开始
+                            continue
+                        } else {
+                            loopStack.removeLast()
+                            Log.d(TAG, "循环结束")
+                        }
+                    }
+                }
+                else -> {
+                    executeSingleAction(runner, action, speed)
+                    if (actionInterval > 0) {
+                        delay(actionInterval)
+                    }
+                }
+            }
+            index++
+        }
+    }
+
+    /** 循环栈帧 */
+    private class LoopFrame(
+        val startIndex: Int,
+        var remaining: Int
+    )
 
     private suspend fun executeSingleAction(runner: ICommandRunner, action: ScriptAction, speed: Float = 1.0f) {
         // DELAY 类型: 仅等待
@@ -311,6 +356,10 @@ class ClickService : Service() {
             }
             ActionType.FIND_TEXT -> {
                 // FIND_TEXT 在 executeFindText 中处理
+                ""
+            }
+            ActionType.REPEAT_START, ActionType.REPEAT_END -> {
+                // 循环控制在 executeActions 中处理
                 ""
             }
             ActionType.DELAY -> {
