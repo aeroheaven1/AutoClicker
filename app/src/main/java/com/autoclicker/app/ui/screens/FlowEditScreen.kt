@@ -349,7 +349,6 @@ private fun FlowActionNode(
     onMoveDown: () -> Unit
 ) {
     val (icon, title, subtitle, isLoop) = describeAction(action)
-
     FlowNodeBase(
         icon = icon,
         title = title,
@@ -384,17 +383,25 @@ private fun FlowActionNode(
     }
 }
 
+/** 动作节点信息 */
+private data class FlowNodeInfo(
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val title: String,
+    val subtitle: String,
+    val isLoop: Boolean
+)
+
 /** 动作描述 */
-private fun describeAction(action: ScriptAction): Triple<androidx.compose.ui.graphics.vector.ImageVector, String, String> {
+private fun describeAction(action: ScriptAction): FlowNodeInfo {
     return when (action.type) {
-        ActionType.TAP -> Triple(Icons.Default.TouchApp, "点击", "(${action.x.toInt()}, ${action.y.toInt()})")
-        ActionType.SWIPE -> Triple(Icons.Default.Swipe, "滑动", "(${action.x.toInt()},${action.y.toInt()})→(${action.x2.toInt()},${action.y2.toInt()}) ${action.duration}ms")
-        ActionType.LONG_PRESS -> Triple(Icons.Default.TouchApp, "长按", "(${action.x.toInt()}, ${action.y.toInt()}) ${action.duration}ms")
-        ActionType.DELAY -> Triple(Icons.Default.Timer, "延迟", "${action.delay}ms")
-        ActionType.RANDOM_TAP -> Triple(Icons.Default.Shuffle, "随机点击", "区域(${action.x.toInt()},${action.y.toInt()})~(${action.x2.toInt()},${action.y2.toInt()})")
-        ActionType.FIND_TEXT -> Triple(Icons.Default.Search, "找字点击", "\"${action.text}\"")
-        ActionType.REPEAT_START -> Triple(Icons.Default.Repeat, "循环开始", "重复 ${action.delay.toInt()} 次")
-        ActionType.REPEAT_END -> Triple(Icons.Default.Repeat, "循环结束", "返回循环起点")
+        ActionType.TAP -> FlowNodeInfo(Icons.Default.TouchApp, "点击", "(${action.x.toInt()}, ${action.y.toInt()})", false)
+        ActionType.SWIPE -> FlowNodeInfo(Icons.Default.Swipe, "滑动", "(${action.x.toInt()},${action.y.toInt()})→(${action.x2.toInt()},${action.y2.toInt()}) ${action.duration}ms", false)
+        ActionType.LONG_PRESS -> FlowNodeInfo(Icons.Default.TouchApp, "长按", "(${action.x.toInt()}, ${action.y.toInt()}) ${action.duration}ms", false)
+        ActionType.DELAY -> FlowNodeInfo(Icons.Default.Timer, "延迟", "${action.delay}ms", false)
+        ActionType.RANDOM_TAP -> FlowNodeInfo(Icons.Default.Shuffle, "随机点击", "区域(${action.x.toInt()},${action.y.toInt()})~(${action.x2.toInt()},${action.y2.toInt()})", false)
+        ActionType.FIND_TEXT -> FlowNodeInfo(Icons.Default.Search, "找字点击", "\"${action.text}\"", false)
+        ActionType.REPEAT_START -> FlowNodeInfo(Icons.Default.Repeat, "循环开始", "重复 ${action.delay.toInt()} 次", true)
+        ActionType.REPEAT_END -> FlowNodeInfo(Icons.Default.Repeat, "循环结束", "返回循环起点", true)
     }
 }
 
@@ -449,6 +456,7 @@ private fun FlowNodeBase(
 }
 
 /** 添加节点菜单项 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddNodeItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,

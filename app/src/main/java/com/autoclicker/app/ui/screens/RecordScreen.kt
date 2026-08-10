@@ -399,6 +399,8 @@ fun ActionItem(
                     ActionType.LONG_PRESS -> Icons.Default.TouchApp
                     ActionType.DELAY -> Icons.Default.Timer
                     ActionType.FIND_TEXT -> Icons.Default.Search
+                    ActionType.REPEAT_START -> Icons.Default.Repeat
+                    ActionType.REPEAT_END -> Icons.Default.Repeat
                 },
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
@@ -417,6 +419,8 @@ fun ActionItem(
                         ActionType.LONG_PRESS -> "长按 (${action.x.toInt()}, ${action.y.toInt()}) ${action.duration}ms"
                         ActionType.DELAY -> "等待 ${action.delay}ms"
                         ActionType.FIND_TEXT -> "找字点击: \"${action.text}\""
+                        ActionType.REPEAT_START -> "循环开始 ×${action.delay.toInt()}"
+                        ActionType.REPEAT_END -> "循环结束"
                     },
                     style = MaterialTheme.typography.bodyMedium
                 )
