@@ -24,6 +24,7 @@ import com.autoclicker.app.service.ShizukuRunner
 import com.autoclicker.app.service.TouchEventRecorder
 import com.autoclicker.app.ui.components.CoordinatePicker
 import com.autoclicker.app.ui.components.FloatingControl
+import com.autoclicker.app.ui.screens.CoordinatePickerActions
 import com.autoclicker.app.ui.screens.HomeScreen
 import com.autoclicker.app.ui.screens.RecordScreen
 import com.autoclicker.app.ui.screens.SettingsScreen
