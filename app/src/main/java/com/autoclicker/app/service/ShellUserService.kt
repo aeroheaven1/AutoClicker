@@ -1,32 +1,44 @@
 package com.autoclicker.app.service
 
-import android.os.IBinder
+import android.content.Context
 import android.util.Log
-import rikka.shizuku.ShizukuUserService
+import androidx.annotation.Keep
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
 /**
- * Shizuku 用户服务
- * 通过 Shizuku 以 shell 权限运行, 在服务内执行 shell 命令
+ * Shizuku 用户服务 (UserService)
+ *
+ * 注意: 这不是 Android Service!
+ * 由 Shizuku 服务器在 shell 权限下通过反射实例化,
+ * 所有方法执行在 Shizuku 服务器进程 (shell/adb 权限)。
+ *
+ * 要求:
+ * 1. 必须有 public 无参构造器 (或带 Context 构造器)
+ * 2. 不能被混淆 (见 proguard-rules.pro)
+ * 3. 通过 Shizuku.bindUserService 绑定
  */
-class ShellUserService : ShizukuUserService(), IShellService.Stub() {
+class ShellUserService : IShellService.Stub() {
 
     companion object {
         private const val TAG = "ShellUserService"
     }
 
-    override fun onBind(intent: android.content.Intent?): IBinder? {
-        Log.d(TAG, "ShellUserService bound, uid=${Process.myUid()}")
-        return super.onBind(intent)
-    }
+    constructor() : super()
+
+    /**
+     * v13+ 支持带 Context 的构造器
+     * 需要 @Keep 注解防止混淆移除
+     */
+    @Keep
+    constructor(context: Context) : this()
 
     /**
      * 执行命令并返回输出
-     * 此方法在 Shizuku shell 权限下运行
+     * 运行在 Shizuku shell 权限下
      */
     override fun exec(command: String): String {
-        Log.d(TAG, "exec: $command")
+        Log.d(TAG, "exec: $command (uid=${android.os.Process.myUid()})")
         return try {
             val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
             val reader = BufferedReader(InputStreamReader(process.inputStream))
@@ -44,7 +56,7 @@ class ShellUserService : ShizukuUserService(), IShellService.Stub() {
     }
 
     /**
-     * 异步执行命令, 不等待结果
+     * 异步执行命令
      */
     override fun execAsync(command: String) {
         Thread {
@@ -60,4 +72,11 @@ class ShellUserService : ShizukuUserService(), IShellService.Stub() {
     }
 
     override fun isAlive(): Boolean = true
+
+    /**
+     * Shizuku 服务器调用, 销毁服务
+     */
+    override fun destroy() {
+        Log.d(TAG, "ShellUserService destroyed")
+    }
 }

@@ -16,13 +16,20 @@ class ShizukuRunner(private val context: Context) : ICommandRunner {
 
     companion object {
         private const val TAG = "ShizukuRunner"
-        private const val BIND_TIMEOUT_MS = 5000L
+        private const val BIND_TIMEOUT_MS = 8000L
     }
 
     @Volatile
     private var shellService: IShellService? = null
 
     private val binderLock = Any()
+
+    private val userServiceArgs: Shizuku.UserServiceArgs = Shizuku.UserServiceArgs(
+        ComponentName(context, ShellUserService::class.java)
+    )
+        .daemon(false)
+        .processNameSuffix("shell")
+        .version(1)
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -44,11 +51,8 @@ class ShizukuRunner(private val context: Context) : ICommandRunner {
     private fun ensureBound() {
         if (shellService != null) return
         try {
-            val args = Shizuku.UserServiceArgs(
-                ComponentName(context, ShellUserService::class.java)
-            )
-            val result = Shizuku.bindUserService(args, connection)
-            Log.d(TAG, "bindUserService result: $result")
+            Shizuku.bindUserService(userServiceArgs, connection)
+            Log.d(TAG, "bindUserService requested")
         } catch (e: Exception) {
             Log.e(TAG, "bindUserService error: ${e.message}")
         }
