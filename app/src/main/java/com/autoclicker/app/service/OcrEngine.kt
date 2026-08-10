@@ -50,6 +50,9 @@ class OcrEngine(
     @Volatile
     private var tessAPI: TessBaseAPI? = null
 
+    @Volatile
+    private var isInit = false
+
     private fun dataPath(): String = context.filesDir.absolutePath + "/tessdata"
 
     /** 是否已下载模型 */
@@ -133,13 +136,14 @@ class OcrEngine(
 
     /** 初始化 Tesseract */
     fun init(): Boolean {
-        if (tessAPI?.isInitialized == true) return true
+        if (isInit && tessAPI != null) return true
         if (!isModelReady()) return false
         return try {
             val api = TessBaseAPI()
             if (api.init(context.filesDir.absolutePath, LANG)) {
                 api.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_BLOCK)
                 tessAPI = api
+                isInit = true
                 Log.d(TAG, "Tesseract initialized")
                 true
             } else {
@@ -233,6 +237,7 @@ class OcrEngine(
     fun release() {
         tessAPI?.end()
         tessAPI = null
+        isInit = false
     }
 }
 
