@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.annotation.Keep
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * Shizuku 用户服务 (UserService)
@@ -22,6 +23,7 @@ class ShellUserService : IShellService.Stub {
 
     companion object {
         private const val TAG = "ShellUserService"
+        private const val MAX_BUFFER_SIZE = 512 * 1024 // 512KB 防溢出
     }
 
     constructor() : super()
@@ -32,6 +34,15 @@ class ShellUserService : IShellService.Stub {
      */
     @Keep
     constructor(context: Context) : this()
+
+    // 流式命令状态
+    @Volatile
+    private var streamProcess: Process? = null
+
+    @Volatile
+    private var streamThread: Thread? = null
+
+    private val streamBuffer = ConcurrentLinkedQueue<String>()
 
     /**
      * 执行命令并返回输出
@@ -71,12 +82,79 @@ class ShellUserService : IShellService.Stub {
         }.start()
     }
 
+    /**
+     * 启动流式命令 (如 getevent), 输出持续写入 buffer
+     */
+    override fun startStream(command: String) {
+        stopStream()
+        streamBuffer.clear()
+        Log.d(TAG, "startStream: $command")
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            streamProcess = process
+
+            streamThread = Thread {
+                try {
+                    val reader = BufferedReader(InputStreamReader(process.inputStream))
+                    var line: String?
+                    while (process.isAlive && reader.readLine().also { line = it } != null) {
+                        val text = line
+                        if (text != null && text.isNotEmpty()) {
+                            streamBuffer.add(text)
+                            // 防溢出: 丢弃最旧的
+                            while (streamBuffer.size > 20000) {
+                                streamBuffer.poll()
+                            }
+                        }
+                    }
+                    reader.close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "stream read error: ${e.message}")
+                }
+            }
+            streamThread?.isDaemon = true
+            streamThread?.start()
+        } catch (e: Exception) {
+            Log.e(TAG, "startStream error: ${e.message}")
+        }
+    }
+
+    /**
+     * 读取并清空流式 buffer
+     */
+    override fun readStream(): String {
+        if (streamBuffer.isEmpty()) return ""
+        val sb = StringBuilder(streamBuffer.size * 32)
+        var line = streamBuffer.poll()
+        while (line != null) {
+            sb.append(line).append('\n')
+            if (sb.length > MAX_BUFFER_SIZE) break
+            line = streamBuffer.poll()
+        }
+        return sb.toString()
+    }
+
+    /**
+     * 停止流式命令
+     */
+    override fun stopStream() {
+        try {
+            streamProcess?.destroy()
+        } catch (_: Exception) {}
+        streamProcess = null
+        try {
+            streamThread?.join(500)
+        } catch (_: Exception) {}
+        streamThread = null
+    }
+
     override fun isAlive(): Boolean = true
 
     /**
      * Shizuku 服务器调用, 销毁服务
      */
     override fun destroy() {
+        stopStream()
         Log.d(TAG, "ShellUserService destroyed")
     }
 }

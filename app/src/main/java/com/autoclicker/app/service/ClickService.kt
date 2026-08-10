@@ -186,13 +186,22 @@ class ClickService : Service() {
     }
 
     private suspend fun executeSingleAction(runner: ICommandRunner, action: ScriptAction) {
+        // DELAY 类型: 仅等待
+        if (action.type == ActionType.DELAY) {
+            if (action.delay > 0) {
+                delay(action.delay)
+            }
+            return
+        }
+
         val cmd = buildActionCommand(action)
         if (cmd.isNotEmpty()) {
             withContext(Dispatchers.IO) {
                 runner.execAsync(cmd)
             }
-            if (action.duration > 0 && action.type != ActionType.DELAY) {
-                delay(action.duration + 50) // 稍微多等一点确保执行完成
+            // 等待动作执行完成 (滑动/长按需要时间)
+            if (action.duration > 0) {
+                delay(action.duration + 50)
             }
         }
     }

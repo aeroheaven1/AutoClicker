@@ -15,4 +15,13 @@ interface ICommandRunner {
 
     /** 获取权限类型名称 */
     fun getPermissionType(): String
+
+    /** 启动流式命令 (如 getevent 持续输出) */
+    fun startStream(command: String) {}
+
+    /** 读取流式命令的新增输出 (读取后清空) */
+    fun readStream(): String = ""
+
+    /** 停止流式命令 */
+    fun stopStream() {}
 }

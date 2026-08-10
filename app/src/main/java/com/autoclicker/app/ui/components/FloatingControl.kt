@@ -32,6 +32,7 @@ class FloatingControl(
         fun onQuickSwipe()
         fun onRecord()
         fun onOpenApp()
+        fun onToggleRecord()
     }
 
     private var windowManager: WindowManager? = null
@@ -48,6 +49,7 @@ class FloatingControl(
     // 面板内控件引用
     private var statusText: TextView? = null
     private var runButtonText: TextView? = null
+    private var recordButtonText: TextView? = null
 
     private var isDragging = false
 
@@ -198,6 +200,12 @@ class FloatingControl(
             callbacks.onToggleRun()
         }.also { runButtonText = it })
 
+        // 录制按钮 (开始/停止切换)
+        recordButtonText = null
+        panel.addView(makePanelButton("● 开始录制") {
+            callbacks.onToggleRecord()
+        }.also { recordButtonText = it })
+
         panel.addView(makePanelButton("👆 快速点击") {
             hidePanel()
             callbacks.onQuickTap()
@@ -283,6 +291,39 @@ class FloatingControl(
     }
 
     /**
+     * 录制模式: 悬浮球缩小+半透明并移到边缘, 避免录制到误触
+     */
+    fun setRecordingMode(active: Boolean) {
+        val ball = floatingBall ?: return
+        val params = ballParams ?: return
+        if (active) {
+            params.width = dp(32)
+            params.height = dp(32)
+            params.alpha = 0.5f
+            // 移到屏幕左侧边缘
+            params.x = 0
+            params.y = (params.y).coerceAtMost(getScreenHeight() - dp(120))
+            ball.alpha = 0.5f
+        } else {
+            params.width = dp(52)
+            params.height = dp(52)
+            params.alpha = 1f
+            ball.alpha = 1f
+        }
+        try {
+            windowManager?.updateViewLayout(ball, params)
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * 更新录制状态
+     */
+    fun setRecording(recording: Boolean) {
+        recordButtonText?.text = if (recording) "■ 停止录制" else "● 开始录制"
+        statusText?.text = if (recording) "状态: REC ● 录制中..." else "状态: 就绪"
+    }
+
+    /**
      * 更新状态文本
      */
     fun updateStatus(text: String) {
@@ -300,6 +341,11 @@ class FloatingControl(
     private fun getScreenWidth(): Int {
         val dm = context.resources.displayMetrics
         return dm.widthPixels
+    }
+
+    private fun getScreenHeight(): Int {
+        val dm = context.resources.displayMetrics
+        return dm.heightPixels
     }
 
     private fun dp(value: Int): Int {

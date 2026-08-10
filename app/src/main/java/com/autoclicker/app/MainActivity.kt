@@ -21,6 +21,7 @@ import com.autoclicker.app.data.ScriptRepository
 import com.autoclicker.app.service.ClickService
 import com.autoclicker.app.service.RootRunner
 import com.autoclicker.app.service.ShizukuRunner
+import com.autoclicker.app.service.TouchEventRecorder
 import com.autoclicker.app.ui.components.FloatingControl
 import com.autoclicker.app.ui.screens.HomeScreen
 import com.autoclicker.app.ui.screens.RecordScreen
@@ -38,6 +39,10 @@ class MainActivity : ComponentActivity() {
 
     // 悬浮窗
     private var floatingControl: FloatingControl? = null
+
+    // 屏幕录制状态
+    private var isRecording = false
+    private var recorder: TouchEventRecorder? = null
 
     // 悬浮窗权限请求
     private val overlayPermissionLauncher = registerForActivityResult(
@@ -301,6 +306,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                override fun onToggleRecord() {
+                    runOnUiThread {
+                        toggleScreenRecording()
+                    }
+                }
+
                 override fun onOpenApp() {
                     runOnUiThread { openApp() }
                 }
@@ -315,6 +326,87 @@ class MainActivity : ComponentActivity() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         startActivity(intent)
+    }
+
+    /**
+     * 切换屏幕录制 (悬浮窗控制)
+     */
+    private fun toggleScreenRecording() {
+        if (isRecording) {
+            stopScreenRecording()
+        } else {
+            startScreenRecording()
+        }
+    }
+
+    /** 开始屏幕录制 */
+    private fun startScreenRecording() {
+        if (!hasAnyPermission()) {
+            requestPermissions()
+            return
+        }
+
+        // 选择权限执行器
+        val shizuku = ShizukuRunner(applicationContext)
+        val root = RootRunner()
+        val runner = when {
+            shizuku.isAvailable() -> shizuku
+            root.isAvailable() -> root
+            else -> {
+                requestPermissions()
+                return
+            }
+        }
+
+        val rec = TouchEventRecorder(runner)
+        recorder = rec
+
+        if (rec.startRecording(lifecycleScope)) {
+            isRecording = true
+            floatingControl?.setRecording(true)
+            floatingControl?.setRecordingMode(true)
+            Toast.makeText(this, "● 屏幕录制已开始, 请操作屏幕 (点击悬浮球停止)", Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(this, "录制启动失败", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** 停止屏幕录制并保存脚本 */
+    private fun stopScreenRecording() {
+        val rec = recorder
+        if (rec == null) {
+            isRecording = false
+            return
+        }
+
+        val actions = rec.stopRecording()
+        recorder = null
+        isRecording = false
+        floatingControl?.setRecording(false)
+        floatingControl?.setRecordingMode(false)
+
+        if (actions.isEmpty()) {
+            Toast.makeText(this, "未录到任何操作", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // 保存为脚本
+        val now = System.currentTimeMillis()
+        val timeStr = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+            .format(java.util.Date(now))
+        val script = Script(
+            name = "屏幕录制 $timeStr",
+            actions = actions.toMutableList(),
+            repeatCount = 1,
+            intervalBetweenActions = 0,
+            intervalBetweenRepeats = 500
+        )
+
+        lifecycleScope.launch {
+            scriptRepository.saveScript(script)
+            Toast.makeText(this@MainActivity, "✓ 已保存脚本: ${script.name} (${actions.size}个动作)", Toast.LENGTH_LONG).show()
+            floatingControl?.updateStatus("已录制 ${actions.size} 个动作")
+        }
     }
 
     private fun requestPermissions() {
@@ -346,11 +438,18 @@ class MainActivity : ComponentActivity() {
         runningScriptId = ClickService.currentScript?.id
         // 更新悬浮面板状态
         floatingControl?.setRunning(ClickService.isRunning)
+        floatingControl?.setRecording(isRecording)
         floatingControl?.updateStatus("权限: $permissionType")
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        // 停止录制
+        if (isRecording) {
+            recorder?.stopRecording()
+            recorder = null
+            isRecording = false
+        }
         Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
         floatingControl?.hide()
         floatingControl = null

@@ -2,6 +2,7 @@ package com.autoclicker.app.service
 
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * Root 权限命令执行器
@@ -10,6 +11,10 @@ import java.io.InputStreamReader
 class RootRunner : ICommandRunner {
 
     private var hasRoot: Boolean? = null
+
+    private var streamProcess: Process? = null
+    private var streamThread: Thread? = null
+    private val streamBuffer = ConcurrentLinkedQueue<String>()
 
     override fun isAvailable(): Boolean {
         if (hasRoot == null) {
@@ -61,6 +66,49 @@ class RootRunner : ICommandRunner {
                 process.destroy()
             } catch (_: Exception) {}
         }.start()
+    }
+
+    override fun startStream(command: String) {
+        stopStream()
+        streamBuffer.clear()
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
+            streamProcess = process
+            streamThread = Thread {
+                try {
+                    val reader = BufferedReader(InputStreamReader(process.inputStream))
+                    var line: String?
+                    while (process.isAlive && reader.readLine().also { line = it } != null) {
+                        val text = line
+                        if (text != null && text.isNotEmpty()) {
+                            streamBuffer.add(text)
+                            while (streamBuffer.size > 20000) streamBuffer.poll()
+                        }
+                    }
+                    reader.close()
+                } catch (_: Exception) {}
+            }
+            streamThread?.isDaemon = true
+            streamThread?.start()
+        } catch (_: Exception) {}
+    }
+
+    override fun readStream(): String {
+        if (streamBuffer.isEmpty()) return ""
+        val sb = StringBuilder(streamBuffer.size * 32)
+        var line = streamBuffer.poll()
+        while (line != null) {
+            sb.append(line).append('\n')
+            line = streamBuffer.poll()
+        }
+        return sb.toString()
+    }
+
+    override fun stopStream() {
+        try { streamProcess?.destroy() } catch (_: Exception) {}
+        streamProcess = null
+        try { streamThread?.join(500) } catch (_: Exception) {}
+        streamThread = null
     }
 
     override fun getPermissionType(): String = "Root"

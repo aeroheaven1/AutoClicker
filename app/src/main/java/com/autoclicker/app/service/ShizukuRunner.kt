@@ -93,5 +93,29 @@ class ShizukuRunner(private val context: Context) : ICommandRunner {
         service?.execAsync(command)
     }
 
+    override fun startStream(command: String) {
+        ensureBound()
+        val service = waitForService(BIND_TIMEOUT_MS)
+        service?.startStream(command)
+    }
+
+    override fun readStream(): String {
+        val service = shellService ?: return ""
+        return try {
+            service.readStream()
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    override fun stopStream() {
+        val service = shellService ?: return
+        try {
+            service.stopStream()
+        } catch (e: Exception) {
+            Log.e(TAG, "stopStream error: ${e.message}")
+        }
+    }
+
     override fun getPermissionType(): String = "Shizuku"
 }
